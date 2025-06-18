@@ -1,0 +1,77 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Izukee Test Script",
+   LoadingTitle = "Testing",
+   LoadingSubtitle = "Izukee",
+   Theme = "Default",
+   ToggleUIKeybind = "K",
+   ConfigurationSaving = {
+      Enabled = true,
+      FileName = "Test Hub"
+   },
+   KeySystem = false
+})
+
+local Tab = Window:CreateTab("Main", 4483362458)
+
+-----------------------
+-- Infinite Jump Toggle
+-----------------------
+local infiniteJumpEnabled = false
+local jumpConnection = nil
+
+Tab:CreateToggle({
+   Name = "Infinite Jump",
+   CurrentValue = false,
+   Callback = function(state)
+      infiniteJumpEnabled = state
+
+      if infiniteJumpEnabled then
+         local Player = game.Players.LocalPlayer
+         local UserInputService = game:GetService("UserInputService")
+
+         if not jumpConnection then
+            jumpConnection = UserInputService.JumpRequest:Connect(function()
+               local character = Player.Character or Player.CharacterAdded:Wait()
+               local humanoid = character:FindFirstChildOfClass("Humanoid")
+               if humanoid then
+                  humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+               end
+            end)
+         end
+      else
+         if jumpConnection then
+            jumpConnection:Disconnect()
+            jumpConnection = nil
+         end
+      end
+   end
+})
+
+-----------------------
+-- WalkSpeed Slider
+-----------------------
+local Player = game.Players.LocalPlayer
+local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+
+-- Update humanoid on respawn
+Player.CharacterAdded:Connect(function(char)
+   humanoid = char:WaitForChild("Humanoid")
+end)
+
+local defaultSpeed = 16
+
+Tab:CreateSlider({
+   Name = "WalkSpeed",
+   Min = 16,
+   Max = 100,
+   Increment = 1,
+   Suffix = "speed",
+   CurrentValue = 16,
+   Callback = function(value)
+      if humanoid then
+         humanoid.WalkSpeed = value
+      end
+   end
+})
