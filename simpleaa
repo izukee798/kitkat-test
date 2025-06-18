@@ -1,3 +1,209 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Izukee Test Script",
+   LoadingTitle = "Testing",
+   LoadingSubtitle = "Izukee",
+   Theme = "Default",
+   ToggleUIKeybind = "K",
+   ConfigurationSaving = {
+      Enabled = true,
+      FileName = "Test Hub"
+   },
+   KeySystem = false
+})
+
+local Tab = Window:CreateTab("Main", 4483362458)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local Player = Players.LocalPlayer
+local humanoid = nil
+local flying = false
+local flySpeed = 50
+local flyBodyVelocity = nil
+local flyBodyGyro = nil
+
+-- Update humanoid on respawn
+Player.CharacterAdded:Connect(function(char)
+   humanoid = char:WaitForChild("Humanoid")
+end)
+humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+
+-- Infinite Jump Toggle
+local infiniteJumpEnabled = false
+local jumpConnection = nil
+
+Tab:CreateToggle({
+   Name = "Infinite Jump",
+   CurrentValue = false,
+   Callback = function(state)
+      infiniteJumpEnabled = state
+      if infiniteJumpEnabled then
+         if not jumpConnection then
+            jumpConnection = UserInputService.JumpRequest:Connect(function()
+               local character = Player.Character or Player.CharacterAdded:Wait()
+               local hum = character:FindFirstChildOfClass("Humanoid")
+               if hum then
+                  hum:ChangeState(Enum.HumanoidStateType.Jumping)
+               end
+            end)
+         end
+      else
+         if jumpConnection then
+            jumpConnection:Disconnect()
+            jumpConnection = nil
+         end
+      end
+   end
+})
+
+-- WalkSpeed Slider
+local defaultSpeed = 16
+
+Tab:CreateSlider({
+   Name = "WalkSpeed",
+   Min = 16,
+   Max = 100,
+   Increment = 1,
+   Suffix = "speed",
+   CurrentValue = defaultSpeed,
+   Callback = function(value)
+      if humanoid then
+         humanoid.WalkSpeed = value
+      end
+   end,
+})
+
+-- Fly Toggle & Speed Slider
+local function toggleFly(state)
+   local character = Player.Character
+   if not character then return end
+   local hrp = character:FindFirstChild("HumanoidRootPart")
+   if not hrp then return end
+
+   flying = state
+
+   if flying then
+      flyBodyVelocity = Instance.new("BodyVelocity")
+      flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+      flyBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+      flyBodyVelocity.Parent = hrp
+
+      flyBodyGyro = Instance.new("BodyGyro")
+      flyBodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+      flyBodyGyro.P = 1e4
+      flyBodyGyro.CFrame = hrp.CFrame
+      flyBodyGyro.Parent = hrp
+   else
+      if flyBodyVelocity then
+         flyBodyVelocity:Destroy()
+         flyBodyVelocity = nil
+      end
+      if flyBodyGyro then
+         flyBodyGyro:Destroy()
+         flyBodyGyro = nil
+      end
+   end
+end
+
+Tab:CreateToggle({
+   Name = "Fly",
+   CurrentValue = false,
+   Callback = function(state)
+      toggleFly(state)
+   end,
+})
+
+Tab:CreateSlider({
+   Name = "Fly Speed",
+   Min = 10,
+   Max = 200,
+   Increment = 5,
+   Suffix = "",
+   CurrentValue = flySpeed,
+   Callback = function(value)
+      flySpeed = value
+   end,
+})
+
+-- Fly movement update
+RunService.Heartbeat:Connect(function()
+   if flying and flyBodyVelocity and flyBodyGyro and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+      local hrp = Player.Character.HumanoidRootPart
+      local camCFrame = workspace.CurrentCamera.CFrame
+      local moveDir = Vector3.new()
+
+      local forward = camCFrame.LookVector
+      local right = camCFrame.RightVector
+
+      if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+         moveDir = moveDir + forward
+      end
+      if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+         moveDir = moveDir - forward
+      end
+      if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+         moveDir = moveDir - right
+      end
+      if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+         moveDir = moveDir + right
+      end
+      if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+         moveDir = moveDir + Vector3.new(0, 1, 0)
+      end
+      if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+         moveDir = moveDir - Vector3.new(0, 1, 0)
+      end
+
+      moveDir = moveDir.Unit
+      if moveDir ~= moveDir then moveDir = Vector3.new() end -- handle NaN
+
+      flyBodyVelocity.Velocity = moveDir * flySpeed
+      flyBodyGyro.CFrame = camCFrame
+   end
+end)
+
+-- Noclip Toggle
+local noclipEnabled = false
+local noclipConnection = nil
+
+Tab:CreateToggle({
+   Name = "Noclip",
+   CurrentValue = false,
+   Callback = function(state)
+      noclipEnabled = state
+
+      if noclipEnabled then
+         noclipConnection = RunService.Stepped:Connect(function()
+            if Player.Character then
+               for _, part in pairs(Player.Character:GetChildren()) do
+                  if part:IsA("BasePart") and part.CanCollide then
+                     part.CanCollide = false
+                  end
+               end
+            end
+         end)
+      else
+         if noclipConnection then
+            noclipConnection:Disconnect()
+            noclipConnection = nil
+         end
+         -- Restore CanCollide true on character parts
+         if Player.Character then
+            for _, part in pairs(Player.Character:GetChildren()) do
+               if part:IsA("BasePart") then
+                  part.CanCollide = true
+               end
+            end
+         end
+      end
+   end
+})
+
+-- ESP with name, health bar, distance
 local espEnabled = false
 local espObjects = {}
 
@@ -11,7 +217,6 @@ local function createESP(player)
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not humanoid then return end
 
-    -- Create a BillboardGui
     local billboardGui = Instance.new("BillboardGui")
     billboardGui.Name = "ESPBillboard"
     billboardGui.Adornee = hrp
@@ -19,14 +224,12 @@ local function createESP(player)
     billboardGui.AlwaysOnTop = true
     billboardGui.Parent = hrp
 
-    -- Container Frame
     local frame = Instance.new("Frame")
     frame.BackgroundTransparency = 0.4
     frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     frame.Size = UDim2.new(1, 0, 1, 0)
     frame.Parent = billboardGui
 
-    -- Name Label
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Size = UDim2.new(1, 0, 0.4, 0)
     nameLabel.BackgroundTransparency = 1
@@ -37,7 +240,6 @@ local function createESP(player)
     nameLabel.Text = player.Name
     nameLabel.Parent = frame
 
-    -- Health Bar Background
     local healthBarBg = Instance.new("Frame")
     healthBarBg.Size = UDim2.new(1, -10, 0.3, 0)
     healthBarBg.Position = UDim2.new(0, 5, 0.5, 0)
@@ -46,14 +248,12 @@ local function createESP(player)
     healthBarBg.BorderSizePixel = 0
     healthBarBg.Parent = frame
 
-    -- Health Bar Foreground
     local healthBar = Instance.new("Frame")
     healthBar.Size = UDim2.new(humanoid.Health / humanoid.MaxHealth, 0, 1, 0)
     healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     healthBar.BorderSizePixel = 0
     healthBar.Parent = healthBarBg
 
-    -- Distance Label
     local distLabel = Instance.new("TextLabel")
     distLabel.Size = UDim2.new(1, 0, 0.3, 0)
     distLabel.Position = UDim2.new(0, 0, 0.8, 0)
@@ -68,7 +268,6 @@ local function createESP(player)
     espObjects[player] = {
         Billboard = billboardGui,
         HealthBar = healthBar,
-        HealthBarBg = healthBarBg,
         DistanceLabel = distLabel,
         Humanoid = humanoid,
         HRP = hrp,
@@ -89,8 +288,10 @@ local function updateESP()
             local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
             esp.HealthBar.Size = UDim2.new(healthPercent, 0, 1, 0)
 
-            local dist = (Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") and
-                (esp.HRP.Position - Player.Character.HumanoidRootPart.Position).Magnitude) or 0
+            local dist = 0
+            if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+                dist = (esp.HRP.Position - Player.Character.HumanoidRootPart.Position).Magnitude
+            end
             esp.DistanceLabel.Text = ("Distance: %.1f"):format(dist)
         else
             removeESP(player)
@@ -146,5 +347,3 @@ Tab:CreateToggle({
         refreshESP()
     end,
 })
-
-
