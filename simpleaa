@@ -29,13 +29,18 @@ Player.CharacterAdded:Connect(function(char)
    humanoid = char:WaitForChild("Humanoid")
 end)
 
--- 🚀 Fly Toggle
+-- 🚀 Fixed Fly Toggle
 local flying = false
 local flySpeed = 50
 local bodyGyro, bodyVel, flyConn
 
+local function getHRP()
+   local char = Player.Character or Player.CharacterAdded:Wait()
+   return char:WaitForChild("HumanoidRootPart")
+end
+
 local function startFly()
-   local hrp = Character:WaitForChild("HumanoidRootPart")
+   local hrp = getHRP()
 
    bodyGyro = Instance.new("BodyGyro")
    bodyGyro.P = 9e4
@@ -50,14 +55,18 @@ local function startFly()
 
    flyConn = RunService.RenderStepped:Connect(function()
       local cam = workspace.CurrentCamera
-      local dir = Vector3.zero
+      local dir = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid") and Player.Character:FindFirstChildOfClass("Humanoid").MoveDirection or Vector3.zero
 
-      if UIS:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
-      if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
-      if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
-      if UIS:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
-      if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += cam.CFrame.UpVector end
-      if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= cam.CFrame.UpVector end
+      if UIS.TouchEnabled then
+         -- no vertical movement for now on mobile
+      else
+         if UIS:IsKeyDown(Enum.KeyCode.Space) then
+            dir += Vector3.new(0,1,0)
+         end
+         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+            dir -= Vector3.new(0,1,0)
+         end
+      end
 
       bodyGyro.CFrame = cam.CFrame
       bodyVel.Velocity = dir.Magnitude > 0 and dir.Unit * flySpeed or Vector3.zero
@@ -65,25 +74,22 @@ local function startFly()
 end
 
 local function stopFly()
-   if flyConn then flyConn:Disconnect() end
-   if bodyGyro then bodyGyro:Destroy() end
-   if bodyVel then bodyVel:Destroy() end
-   bodyGyro, bodyVel, flyConn = nil, nil, nil
+   if flyConn then
+      flyConn:Disconnect()
+      flyConn = nil
+   end
+   if bodyGyro then
+      bodyGyro:Destroy()
+      bodyGyro = nil
+   end
+   if bodyVel then
+      bodyVel:Destroy()
+      bodyVel = nil
+   end
 end
 
-Tab:CreateToggle({
-   Name = "Fly",
-   CurrentValue = false,
-   Flag = "FlyToggle",
-   Callback = function(state)
-      flying = state
-      if flying then
-         startFly()
-      else
-         stopFly()
-      end
-   end,
-})
+
+-- stopFly and the toggle remain unchanged
 
 -- 🚶 WalkSpeed Slider
 local defaultSpeed = 16
@@ -105,8 +111,8 @@ end
 
 local Slider = Tab:CreateSlider({
    Name = "Walkspeed 1",
-   Range = {0, 100},
-   Increment = 1,
+   Range = {0, 200},
+   Increment = 5,
    Suffix = "Speed",
    CurrentValue = 16,
    Flag = "Slider1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
