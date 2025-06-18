@@ -53,14 +53,19 @@ Tab:CreateToggle({
 -- WalkSpeed Slider
 -----------------------
 local Player = game.Players.LocalPlayer
-local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
-
--- Update humanoid on respawn
-Player.CharacterAdded:Connect(function(char)
-   humanoid = char:WaitForChild("Humanoid")
-end)
-
+local humanoid = nil
 local defaultSpeed = 16
+
+local function onCharacterAdded(char)
+   humanoid = char:WaitForChild("Humanoid")
+   humanoid.WalkSpeed = defaultSpeed
+end
+
+Player.CharacterAdded:Connect(onCharacterAdded)
+
+if Player.Character then
+   onCharacterAdded(Player.Character)
+end
 
 Tab:CreateSlider({
    Name = "WalkSpeed",
@@ -68,10 +73,11 @@ Tab:CreateSlider({
    Max = 100,
    Increment = 1,
    Suffix = "speed",
-   CurrentValue = 16,
+   CurrentValue = defaultSpeed,
    Callback = function(value)
       if humanoid then
          humanoid.WalkSpeed = value
       end
    end
 })
+
