@@ -88,18 +88,34 @@ Tab:CreateToggle({
 -- 🚶 WalkSpeed Slider
 local defaultSpeed = 16
 
-Tab:CreateSlider({
-   Name = "WalkSpeed",
-   Min = 16,
-   Max = 100,
+local Player = game.Players.LocalPlayer
+local humanoid = nil
+local defaultSpeed = 16
+
+local function onCharacterAdded(char)
+   humanoid = char:WaitForChild("Humanoid")
+   humanoid.WalkSpeed = defaultSpeed
+end
+
+Player.CharacterAdded:Connect(onCharacterAdded)
+
+if Player.Character then
+   onCharacterAdded(Player.Character)
+end
+
+local Slider = Tab:CreateSlider({
+   Name = "Walkspeed 1",
+   Range = {0, 100},
    Increment = 1,
-   Suffix = "speed",
-   CurrentValue = defaultSpeed,
-   Callback = function(value)
-      if humanoid then
-         humanoid.WalkSpeed = value
-      end
-   end
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "Slider1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+   
+        if humanoid then
+             humanoid.WalkSpeed = Value
+        end
+     end
 })
 
 -- 🚫 Noclip Toggle
