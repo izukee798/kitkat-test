@@ -102,3 +102,51 @@ Tab:CreateSlider({
    end
 })
 
+-- 🚫 Noclip Toggle
+local noclip = false
+local noclipConn = nil
+
+local function startNoclip()
+   noclipConn = game:GetService("RunService").Stepped:Connect(function()
+      local char = Player.Character
+      if char then
+         for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+               part.CanCollide = false
+            end
+         end
+      end
+   end)
+end
+
+local function stopNoclip()
+   if noclipConn then
+      noclipConn:Disconnect()
+      noclipConn = nil
+   end
+
+   local char = Player.Character
+   if char then
+      for _, part in pairs(char:GetDescendants()) do
+         if part:IsA("BasePart") then
+            part.CanCollide = true
+         end
+      end
+   end
+end
+
+Tab:CreateToggle({
+   Name = "Noclip",
+   CurrentValue = false,
+   Flag = "NoclipToggle",
+   Callback = function(state)
+      noclip = state
+      if noclip then
+         startNoclip()
+      else
+         stopNoclip()
+      end
+   end,
+})
+
+
