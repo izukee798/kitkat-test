@@ -67,17 +67,136 @@ if Player.Character then
    onCharacterAdded(Player.Character)
 end
 
-Tab:CreateSlider({
-   Name = "WalkSpeed",
-   Min = 16,
-   Max = 100,
+local Slider = Tab:CreateSlider({
+   Name = "Walkspeed 1",
+   Range = {0, 100},
    Increment = 1,
-   Suffix = "speed",
-   CurrentValue = defaultSpeed,
-   Callback = function(value)
-      if humanoid then
-         humanoid.WalkSpeed = value
-      end
-   end
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "Slider1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+   
+        if humanoid then
+             humanoid.WalkSpeed = Value
+        end
+     end
 })
 
+local Player = game.Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Fly variables
+local flying = false
+local flySpeed = 50
+local flyBodyVelocity = nil
+
+local function startFly()
+    local character = Player.Character or Player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+    flyBodyVelocity = Instance.new("BodyVelocity")
+    flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    flyBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    flyBodyVelocity.Parent = humanoidRootPart
+
+    flying = true
+
+    RunService:BindToRenderStep("Fly", 301, function()
+        if flying and flyBodyVelocity and humanoidRootPart then
+            local moveDirection = Vector3.new()
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                moveDirection = moveDirection - workspace.CurrentCamera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                moveDirection = moveDirection - workspace.CurrentCamera.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                moveDirection = moveDirection + workspace.CurrentCamera.CFrame.RightVector
+            end
+
+            moveDirection = Vector3.new(moveDirection.X, 0, moveDirection.Z).Unit
+            if moveDirection.Magnitude > 0 then
+                flyBodyVelocity.Velocity = moveDirection * flySpeed
+            else
+                flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            end
+        end
+    end)
+end
+
+local function stopFly()
+    flying = false
+    RunService:UnbindFromRenderStep("Fly")
+    if flyBodyVelocity then
+        flyBodyVelocity:Destroy()
+        flyBodyVelocity = nil
+    end
+end
+
+-- Noclip variables
+local noclipEnabled = false
+local noclipConnection = nil
+
+local function startNoclip()
+    noclipEnabled = true
+    local character = Player.Character or Player.CharacterAdded:Wait()
+
+    noclipConnection = RunService.Stepped:Connect(function()
+        if noclipEnabled then
+            for _, part in pairs(character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+end
+
+local function stopNoclip()
+    noclipEnabled = false
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
+    end
+
+    local character = Player.Character
+    if character then
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+-- Fly Toggle
+Tab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Flag = "FlyToggle",
+    Callback = function(value)
+        if value then
+            startFly()
+        else
+            stopFly()
+        end
+    end
+})
+
+-- Noclip Toggle
+Tab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "NoclipToggle",
+    Callback = function(value)
+        if value then
+            startNoclip()
+        else
+            stopNoclip()
+        end
+    end
+})
