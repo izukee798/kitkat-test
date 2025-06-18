@@ -347,3 +347,96 @@ Tab:CreateToggle({
         refreshESP()
     end,
 })
+
+local PlantsTab = Window:CreateTab("Plants ESP", 4483362458) -- Use any icon ID you like
+
+local espEnabled = false
+local espObjects = {}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local localPlayer = Players.LocalPlayer
+
+local plantsFolder = workspace.Farm:GetChildren()[3].Important.Plants_Physical
+
+local function createPlantESP(plant)
+    if espObjects[plant] then return end
+
+    local mainPart = plant.PrimaryPart or plant:FindFirstChildWhichIsA("BasePart")
+    if not mainPart then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "PlantESP"
+    billboard.Adornee = mainPart
+    billboard.Size = UDim2.new(0, 100, 0, 40)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = mainPart
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextStrokeTransparency = 0
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 14
+    label.Text = plant.Name
+    label.Parent = billboard
+
+    espObjects[plant] = billboard
+end
+
+local function removePlantESP(plant)
+    if espObjects[plant] then
+        espObjects[plant]:Destroy()
+        espObjects[plant] = nil
+    end
+end
+
+local function updatePlantESP()
+    for plant, billboard in pairs(espObjects) do
+        if plant.PrimaryPart and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (plant.PrimaryPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+            billboard.TextLabel.Text = string.format("%s\n%.1f studs", plant.Name, distance)
+        else
+            removePlantESP(plant)
+        end
+    end
+end
+
+local function refreshPlantESP()
+    for _, plant in pairs(plantsFolder:GetChildren()) do
+        if plant:IsA("Model") or plant:IsA("BasePart") then
+            if not espObjects[plant] then
+                createPlantESP(plant)
+            end
+        end
+    end
+
+    for plant, _ in pairs(espObjects) do
+        if not plant or not plant.Parent then
+            removePlantESP(plant)
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if espEnabled then
+        updatePlantESP()
+    end
+end)
+
+PlantsTab:CreateToggle({
+    Name = "Enable Plants ESP",
+    CurrentValue = false,
+    Flag = "PlantsESP_Toggle",
+    Callback = function(state)
+        espEnabled = state
+        if espEnabled then
+            refreshPlantESP()
+        else
+            for plant, _ in pairs(espObjects) do
+                removePlantESP(plant)
+            end
+        end
+    end,
+})
