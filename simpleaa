@@ -1,174 +1,150 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local espEnabled = false
+local espObjects = {}
 
-local Window = Rayfield:CreateWindow({
-   Name = "Izukee Test Script",
-   LoadingTitle = "Testing",
-   LoadingSubtitle = "Izukee",
-   Theme = "Default",
-   ToggleUIKeybind = "K",
-   ConfigurationSaving = {
-      Enabled = true,
-      FileName = "Test Hub"
-   },
-   KeySystem = false
-})
+local function createESP(player)
+    if espObjects[player] then return end -- already created
 
-local Tab = Window:CreateTab("Main", 4483362458)
+    local char = player.Character
+    if not char then return end
 
--- 🔁 Player Setup
-local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return end
 
-local Player = Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local humanoid = Character:FindFirstChildOfClass("Humanoid")
+    -- Create a BillboardGui
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Name = "ESPBillboard"
+    billboardGui.Adornee = hrp
+    billboardGui.Size = UDim2.new(0, 150, 0, 50)
+    billboardGui.AlwaysOnTop = true
+    billboardGui.Parent = hrp
 
-Player.CharacterAdded:Connect(function(char)
-   Character = char
-   humanoid = char:WaitForChild("Humanoid")
+    -- Container Frame
+    local frame = Instance.new("Frame")
+    frame.BackgroundTransparency = 0.4
+    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.Parent = billboardGui
+
+    -- Name Label
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.Font = Enum.Font.SourceSansBold
+    nameLabel.TextSize = 14
+    nameLabel.Text = player.Name
+    nameLabel.Parent = frame
+
+    -- Health Bar Background
+    local healthBarBg = Instance.new("Frame")
+    healthBarBg.Size = UDim2.new(1, -10, 0.3, 0)
+    healthBarBg.Position = UDim2.new(0, 5, 0.5, 0)
+    healthBarBg.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    healthBarBg.BackgroundTransparency = 0.6
+    healthBarBg.BorderSizePixel = 0
+    healthBarBg.Parent = frame
+
+    -- Health Bar Foreground
+    local healthBar = Instance.new("Frame")
+    healthBar.Size = UDim2.new(humanoid.Health / humanoid.MaxHealth, 0, 1, 0)
+    healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    healthBar.BorderSizePixel = 0
+    healthBar.Parent = healthBarBg
+
+    -- Distance Label
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Size = UDim2.new(1, 0, 0.3, 0)
+    distLabel.Position = UDim2.new(0, 0, 0.8, 0)
+    distLabel.BackgroundTransparency = 1
+    distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    distLabel.TextStrokeTransparency = 0.7
+    distLabel.Font = Enum.Font.SourceSans
+    distLabel.TextSize = 12
+    distLabel.Text = "Distance: 0"
+    distLabel.Parent = frame
+
+    espObjects[player] = {
+        Billboard = billboardGui,
+        HealthBar = healthBar,
+        HealthBarBg = healthBarBg,
+        DistanceLabel = distLabel,
+        Humanoid = humanoid,
+        HRP = hrp,
+    }
+end
+
+local function removeESP(player)
+    if espObjects[player] then
+        espObjects[player].Billboard:Destroy()
+        espObjects[player] = nil
+    end
+end
+
+local function updateESP()
+    for player, esp in pairs(espObjects) do
+        local humanoid = esp.Humanoid
+        if humanoid and humanoid.Parent then
+            local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+            esp.HealthBar.Size = UDim2.new(healthPercent, 0, 1, 0)
+
+            local dist = (Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") and
+                (esp.HRP.Position - Player.Character.HumanoidRootPart.Position).Magnitude) or 0
+            esp.DistanceLabel.Text = ("Distance: %.1f"):format(dist)
+        else
+            removeESP(player)
+        end
+    end
+end
+
+local function refreshESP()
+    if not espEnabled then
+        for player, _ in pairs(espObjects) do
+            removeESP(player)
+        end
+        return
+    end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Player then
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChildOfClass("Humanoid") then
+                if not espObjects[player] then
+                    createESP(player)
+                end
+            else
+                removeESP(player)
+            end
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        if espEnabled then
+            refreshESP()
+        end
+    end)
 end)
 
--- 🚀 Fixed Fly Toggle
-local flying = false
-local flySpeed = 50
-local bodyGyro, bodyVel, flyConn
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
+end)
 
-local function getHRP()
-   local char = Player.Character or Player.CharacterAdded:Wait()
-   return char:WaitForChild("HumanoidRootPart")
-end
-
-local function startFly()
-   local hrp = getHRP()
-
-   bodyGyro = Instance.new("BodyGyro")
-   bodyGyro.P = 9e4
-   bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-   bodyGyro.CFrame = hrp.CFrame
-   bodyGyro.Parent = hrp
-
-   bodyVel = Instance.new("BodyVelocity")
-   bodyVel.Velocity = Vector3.zero
-   bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-   bodyVel.Parent = hrp
-
-   flyConn = RunService.RenderStepped:Connect(function()
-      local cam = workspace.CurrentCamera
-      local dir = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid") and Player.Character:FindFirstChildOfClass("Humanoid").MoveDirection or Vector3.zero
-
-      if UIS.TouchEnabled then
-         -- no vertical movement for now on mobile
-      else
-         if UIS:IsKeyDown(Enum.KeyCode.Space) then
-            dir += Vector3.new(0,1,0)
-         end
-         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
-            dir -= Vector3.new(0,1,0)
-         end
-      end
-
-      bodyGyro.CFrame = cam.CFrame
-      bodyVel.Velocity = dir.Magnitude > 0 and dir.Unit * flySpeed or Vector3.zero
-   end)
-end
-
-local function stopFly()
-   if flyConn then
-      flyConn:Disconnect()
-      flyConn = nil
-   end
-   if bodyGyro then
-      bodyGyro:Destroy()
-      bodyGyro = nil
-   end
-   if bodyVel then
-      bodyVel:Destroy()
-      bodyVel = nil
-   end
-end
-
-
--- stopFly and the toggle remain unchanged
-
--- 🚶 WalkSpeed Slider
-local defaultSpeed = 16
-
-local Player = game.Players.LocalPlayer
-local humanoid = nil
-local defaultSpeed = 16
-
-local function onCharacterAdded(char)
-   humanoid = char:WaitForChild("Humanoid")
-   humanoid.WalkSpeed = defaultSpeed
-end
-
-Player.CharacterAdded:Connect(onCharacterAdded)
-
-if Player.Character then
-   onCharacterAdded(Player.Character)
-end
-
-local Slider = Tab:CreateSlider({
-   Name = "Walkspeed 1",
-   Range = {0, 200},
-   Increment = 5,
-   Suffix = "Speed",
-   CurrentValue = 16,
-   Flag = "Slider1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
-   Callback = function(Value)
-   
-        if humanoid then
-             humanoid.WalkSpeed = Value
-        end
-     end
-})
-
--- 🚫 Noclip Toggle
-local noclip = false
-local noclipConn = nil
-
-local function startNoclip()
-   noclipConn = game:GetService("RunService").Stepped:Connect(function()
-      local char = Player.Character
-      if char then
-         for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide then
-               part.CanCollide = false
-            end
-         end
-      end
-   end)
-end
-
-local function stopNoclip()
-   if noclipConn then
-      noclipConn:Disconnect()
-      noclipConn = nil
-   end
-
-   local char = Player.Character
-   if char then
-      for _, part in pairs(char:GetDescendants()) do
-         if part:IsA("BasePart") then
-            part.CanCollide = true
-         end
-      end
-   end
-end
+RunService.RenderStepped:Connect(function()
+    if espEnabled then
+        updateESP()
+    end
+end)
 
 Tab:CreateToggle({
-   Name = "Noclip",
-   CurrentValue = false,
-   Flag = "NoclipToggle",
-   Callback = function(state)
-      noclip = state
-      if noclip then
-         startNoclip()
-      else
-         stopNoclip()
-      end
-   end,
+    Name = "ESP",
+    CurrentValue = false,
+    Flag = "ESPToggle",
+    Callback = function(state)
+        espEnabled = state
+        refreshESP()
+    end,
 })
 
 
